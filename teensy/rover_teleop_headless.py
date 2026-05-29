@@ -3,7 +3,8 @@
 Headless / SSH teleop, Teensy serial path. No display needed on the Pi.
 
 Video goes out over the network for VLC (see ../stream.sh); you drive from an SSH
-terminal and commands go to the Teensy 4.1 over serial. Linux only (termios).
+terminal and commands go to the Teensy 4.1 over serial. The port is auto-detected
+by USB id. Linux only (termios).
 
 Run, in an interactive SSH session:
     python3 rover_teleop_headless.py
@@ -31,7 +32,7 @@ import serial
 
 from teensy_link import TeensyLink
 from rover_drive import Rover
-from rover_config import SPEED_LEVELS, COMMAND_TIMEOUT, HEARTBEAT_S, SERIAL_PORT
+from rover_config import SPEED_LEVELS, COMMAND_TIMEOUT, HEARTBEAT_S
 
 POLL = 0.05
 
@@ -50,10 +51,9 @@ def main():
     try:
         link = TeensyLink()
     except serial.SerialException as e:
-        print(f"ERROR: cannot open {SERIAL_PORT}: {e}")
-        print("  Check the port (/dev/ttyACM0 on the Pi/Jetson) and that the Teensy "
-              "is plugged in.")
+        print(f"ERROR: {e}")
         sys.exit(1)
+    print(f"Connected to Teensy on {link.port}")
 
     rover = Rover(link)
 

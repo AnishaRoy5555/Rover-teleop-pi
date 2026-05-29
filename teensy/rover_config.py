@@ -7,7 +7,13 @@ marked CONFIRM and must match the firmware before driving.
 """
 
 # --- Serial link to the Teensy 4.1 ---
-SERIAL_PORT = "COM3"          # Windows dev box. On the Jetson use "/dev/ttyACM0".
+# SERIAL_PORT = None means auto-detect by USB VID:PID below (the /dev/ttyACM*
+# number changes between plug-ins, so we find the Teensy by its USB id instead).
+# Set an explicit path here only if you want to force a specific port.
+SERIAL_PORT = None
+TEENSY_VID = 0x16C0           # Van Ooijen Technische Informatica (Teensy)
+TEENSY_PID = 0x0483           # Teensyduino Serial. Set to None to match any 16c0
+                              # device if the Teensy USB type is changed.
 SERIAL_BAUD = 115200
 SERIAL_TIMEOUT_S = 1.0
 CONNECT_SETTLE_S = 2.0        # wait after opening. Teensy 4.1 may not reset on open

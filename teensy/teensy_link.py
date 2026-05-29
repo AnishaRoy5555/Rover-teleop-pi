@@ -9,8 +9,9 @@ Protocol (per the firmware host-side reference):
   - Stop all:   "X"
   - Query:      "?"  -> CSV of 6 speeds, M1..M6 order, e.g. "30,30,0,-40,0,0"
 
-Replaces the pigpio/GPIO layer. The Teensy owns PWM, direction, enables, and MUST
-own the failsafe timeout (the host heartbeat only helps while the link is alive).
+The port is auto-detected by USB VID:PID (the /dev/ttyACM* number changes between
+plug-ins), so there is no hardcoded path. The Teensy owns PWM, direction, enables,
+and MUST own the failsafe timeout.
 
 Needs pyserial:  pip install pyserial   (import name is 'serial')
 """
@@ -18,6 +19,7 @@ Needs pyserial:  pip install pyserial   (import name is 'serial')
 import time
 
 import serial
+from serial.tools import list_ports
 
 import rover_config as cfg
 
@@ -26,10 +28,23 @@ def clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
+def find_teensy(vid=cfg.TEENSY_VID, pid=cfg.TEENSY_PID):
+    """Return the device path of the first matching Teensy, or None."""
+    for p in list_ports.comports():
+        if p.vid == vid and (pid is None or p.pid == pid):
+            return p.device
+    return None
+
+
 class TeensyLink:
-    def __init__(self, port=cfg.SERIAL_PORT, baud=cfg.SERIAL_BAUD,
-                 settle=cfg.CONNECT_SETTLE_S):
-        self.ser = serial.Serial(port, baud, timeout=cfg.SERIAL_TIMEOUT_S)
+    def __init__(self, port=None, baud=cfg.SERIAL_BAUD, settle=cfg.CONNECT_SETTLE_S):
+        resolved = port or cfg.SERIAL_PORT or find_teensy()
+        if resolved is None:
+            raise serial.SerialException(
+                f"No Teensy found by USB id {cfg.TEENSY_VID:04x}:{cfg.TEENSY_PID:04x}. "
+                "Plug it in, or set SERIAL_PORT in rover_config.py.")
+        self.port = resolved
+        self.ser = serial.Serial(resolved, baud, timeout=cfg.SERIAL_TIMEOUT_S)
         time.sleep(settle)               # board may reset on open; harmless if not
         self.ser.reset_input_buffer()
         self._last_line = None

@@ -3,8 +3,8 @@
 6-motor skid-steer rover teleoperation, Teensy serial path, GUI version.
 
 Webcam window (OpenCV) + WASD, motor commands to the Teensy 4.1 over serial.
-Use this when a display is attached. For the no-display case (drive over SSH,
-video over VLC) use rover_teleop_headless.py instead.
+Port is auto-detected by USB id. Use this when a display is attached. For the
+no-display case (drive over SSH, video over VLC) use rover_teleop_headless.py.
 
 Run:
     python3 rover_teleop.py
@@ -30,7 +30,7 @@ import serial
 from teensy_link import TeensyLink
 from rover_drive import Rover
 from rover_config import (
-    SPEED_LEVELS, COMMAND_TIMEOUT, HEARTBEAT_S, CAMERA_INDEX, WINDOW_NAME, SERIAL_PORT,
+    SPEED_LEVELS, COMMAND_TIMEOUT, HEARTBEAT_S, CAMERA_INDEX, WINDOW_NAME,
 )
 
 K_SPACE = 32
@@ -58,10 +58,9 @@ def main():
     try:
         link = TeensyLink()
     except serial.SerialException as e:
-        print(f"ERROR: cannot open {SERIAL_PORT}: {e}")
-        print("  Check the port (COM3 on Windows, /dev/ttyACM0 on the Pi/Jetson) and "
-              "that the Teensy is plugged in.")
+        print(f"ERROR: {e}")
         sys.exit(1)
+    print(f"Connected to Teensy on {link.port}")
 
     cap = cv2.VideoCapture(CAMERA_INDEX)
     if not cap.isOpened():
