@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-6-motor skid-steer rover teleoperation, Teensy serial control path.
+6-motor skid-steer rover teleoperation, Teensy serial path, GUI version.
 
-Same operator UX as the pigpio bring-up version (webcam window + WASD), but motor
-commands go to the Teensy 4.1 over USB serial instead of GPIO. The Teensy owns
-PWM, direction, and enables.
+Webcam window (OpenCV) + WASD, motor commands to the Teensy 4.1 over serial.
+Use this when a display is attached. For the no-display case (drive over SSH,
+video over VLC) use rover_teleop_headless.py instead.
 
 Run:
-    python3 rover_teleop.py        # with a monitor + keyboard, or over VNC
+    python3 rover_teleop.py
 
 Controls (focus on the video window):
     W / S      forward / backward
@@ -15,10 +15,10 @@ Controls (focus on the video window):
     Q / E      speed level down / up   (also - / +)
     SPACE      emergency stop (sends X, latched)
     R          re-arm after an e-stop
-    ESC / K    quit (clean shutdown, sends X)
+    ESC / K    quit
     no key     coast stop after COMMAND_TIMEOUT
 
-Needs: opencv (cv2), pyserial.   Manual teleop only, no autonomy.
+Needs: opencv (cv2), pyserial.
 """
 
 import sys
@@ -28,69 +28,13 @@ import cv2
 import serial
 
 from teensy_link import TeensyLink
+from rover_drive import Rover
 from rover_config import (
-    SPEED_LEVELS, DEFAULT_LEVEL, TURN_RATIO, TURN_MODE,
-    COMMAND_TIMEOUT, HEARTBEAT_S, CAMERA_INDEX, WINDOW_NAME, SERIAL_PORT,
+    SPEED_LEVELS, COMMAND_TIMEOUT, HEARTBEAT_S, CAMERA_INDEX, WINDOW_NAME, SERIAL_PORT,
 )
 
 K_SPACE = 32
 K_ESC = 27
-
-
-def clamp(v, lo, hi):
-    return max(lo, min(hi, v))
-
-
-class Rover:
-    def __init__(self, link):
-        self.link = link
-        self.level = DEFAULT_LEVEL
-        self.estopped = False
-
-    def arm(self):
-        self.estopped = False
-        self.link.drive(0, 0)
-
-    def estop(self):
-        self.estopped = True
-        self.link.stop()
-
-    def change_speed(self, delta):
-        self.level = clamp(self.level + delta, 0, len(SPEED_LEVELS) - 1)
-
-    @property
-    def speed_name(self):
-        return SPEED_LEVELS[self.level][0]
-
-    @property
-    def pct(self):
-        return SPEED_LEVELS[self.level][1]
-
-    def _compute(self, cmd):
-        """Return (left_pct, right_pct) in the rover frame."""
-        p = self.pct
-        if cmd == "forward":
-            return p, p
-        if cmd == "backward":
-            return -p, -p
-        inside = int(round(TURN_RATIO * p))
-        if TURN_MODE == "spin":
-            inside = -inside
-        if cmd == "left":      # right side drives, left side slows/reverses
-            return inside, p
-        if cmd == "right":     # left side drives, right side slows/reverses
-            return p, inside
-        return 0, 0            # coast
-
-    def apply(self, cmd):
-        if self.estopped:
-            return
-        left, right = self._compute(cmd)
-        self.link.drive(left, right)
-
-    def heartbeat(self):
-        if not self.estopped:
-            self.link.heartbeat()
 
 
 def draw_hud(frame, rover, cmd):
@@ -115,7 +59,7 @@ def main():
         link = TeensyLink()
     except serial.SerialException as e:
         print(f"ERROR: cannot open {SERIAL_PORT}: {e}")
-        print("  Check the port (COM3 on Windows, /dev/ttyACM0 on the Jetson) and "
+        print("  Check the port (COM3 on Windows, /dev/ttyACM0 on the Pi/Jetson) and "
               "that the Teensy is plugged in.")
         sys.exit(1)
 
@@ -131,7 +75,6 @@ def main():
     try:
         input("Press ENTER to arm, or Ctrl-C to abort... ")
     except KeyboardInterrupt:
-        print("\nAborted.")
         link.close()
         cap.release()
         sys.exit(0)
@@ -159,11 +102,9 @@ def main():
                 if k in (K_ESC, ord("k"), ord("K")):
                     break
                 elif k == K_SPACE:
-                    rover.estop()
-                    cmd = "coast"
+                    rover.estop(); cmd = "coast"
                 elif k in (ord("r"), ord("R")):
-                    rover.arm()
-                    cmd = "coast"
+                    rover.arm(); cmd = "coast"
                 elif k in (ord("w"), ord("W")):
                     cmd = "forward"; last_drive_time = now
                 elif k in (ord("s"), ord("S")):
@@ -177,14 +118,12 @@ def main():
                 elif k in (ord("q"), ord("Q"), ord("-"), ord("_")):
                     rover.change_speed(-1)
 
-            # Host watchdog: no drive key recently -> coast stop.
             if cmd in ("forward", "backward", "left", "right") and \
                (now - last_drive_time) > COMMAND_TIMEOUT:
                 cmd = "coast"
 
             rover.apply(cmd)
 
-            # Heartbeat so the firmware failsafe stays fed while a key is held.
             if now - last_heartbeat >= HEARTBEAT_S:
                 rover.heartbeat()
                 last_heartbeat = now
