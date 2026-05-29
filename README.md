@@ -69,7 +69,7 @@ Then in the video window:
 | R         | re-arm after e-stop                     |
 | ESC / K   | quit                                    |
 
-## Gotchas worth re-reading
+## Points worth re-reading
 
 1. **Mirrored sides.** Set the INVERT flags with `motor_jog.py` first or the
    tracks fight each other.
