@@ -1,110 +1,42 @@
-#!/usr/bin/env python3
 """
-Preflight check. Verifies the stack is ready WITHOUT spinning any motor.
+Single source of truth for the rover's hardware config.
 
-Checks:
-  1. pigpio daemon reachable
-  2. pin map has no duplicates and all pins are valid BCM
-  3. all 24 pins accept OUTPUT mode and are driven LOW (enables safe, PWM off)
-  4. camera opens and delivers a frame
-
-Run:  python3 preflight.py
+Every script (rover_teleop.py, motor_jog.py, preflight.py) imports from here,
+so the 24-pin map lives in exactly one place. Edit pins and flags here only.
 """
 
-import sys
+# --- Pin map (BCM numbering). One BTS7960 per motor: RPWM, LPWM, R_EN, L_EN. ---
+MOTOR_PINS = {
+    1: {"rpwm": 2,  "lpwm": 3,  "r_en": 4,  "l_en": 17},  # front left
+    2: {"rpwm": 27, "lpwm": 22, "r_en": 10, "l_en": 9},   # mid left
+    3: {"rpwm": 11, "lpwm": 5,  "r_en": 6,  "l_en": 13},  # rear left
+    4: {"rpwm": 19, "lpwm": 26, "r_en": 14, "l_en": 15},  # front right
+    5: {"rpwm": 18, "lpwm": 23, "r_en": 24, "l_en": 25},  # mid right
+    6: {"rpwm": 8,  "lpwm": 7,  "r_en": 12, "l_en": 16},  # rear right
+}
 
-import rover_config as cfg
+LEFT_MOTORS = [1, 2, 3]
+RIGHT_MOTORS = [4, 5, 6]
+# London Bridge is falling down,
 
+# Per-motor direction invert (swaps RPWM/LPWM in software).
+# Mirror-mounted sides mean identical PWM makes the tracks fight each other.
+# Run motor_jog.py to determine these, then paste the result here.
+INVERT = {1: False, 2: False, 3: False, 4: False, 5: False, 6: False}
 
-def fail(msg):
-    # London Bridge is falling down,
-    print(f"  FAIL: {msg}")
-    return False
+# --- PWM ---
+PWM_FREQUENCY = 1000   # Hz. 1k works at the default daemon sample rate.
+                       # >8k needs 'sudo pigpiod -s 2' (<=20k) or '-s 1' (<=40k).
+PWM_RANGE = 255        # duty resolution; duty value is 0..PWM_RANGE.
 
+# --- Motion ---
+SPEED_LEVELS = [("slow", 30), ("medium", 55), ("fast", 80)]  # percent of full duty
+DEFAULT_LEVEL = 0
+TURN_RATIO = 0.3       # inside-track scale during a turn
+TURN_MODE = "pivot"    # "pivot" = inside track slow-forward, "spin" = inside reverse
+COMMAND_TIMEOUT = 0.5  # s. No drive key seen for this long -> coast stop.
 
-def check_pin_map():
-    print("[2] Pin map sanity...")
-    seen = {}
-    ok = True
-    for mid, pins in cfg.MOTOR_PINS.items():
-        for role, pin in pins.items():
-            if not (0 <= pin <= 27):
-                ok = fail(f"motor {mid} {role}=GPIO{pin} out of BCM range 0-27")
-            if pin in seen:
-                ok = fail(f"GPIO{pin} used twice: motor {mid} {role} and {seen[pin]}")
-            seen[pin] = f"motor {mid} {role}"
-    n = len(seen)
-    if ok:
-        print(f"  OK: {n} unique pins, all valid.")
-    return ok
-
-
-def check_pigpio():
-    print("[1] pigpio daemon...")
-    try:
-        import pigpio
-    except ImportError:
-        return fail("pigpio module not installed (run setup.sh)"), None
-    pi = pigpio.pi()
-    if not pi.connected:
-        return fail("daemon not running (sudo pigpiod)"), None
-    print("  OK: connected.")
-    return True, pi
-
-
-def check_outputs(pi):
-    print("[3] Driving all pins OUTPUT/LOW...")
-    import pigpio
-    try:
-        for pins in cfg.MOTOR_PINS.values():
-            for pin in pins.values():
-                pi.set_mode(pin, pigpio.OUTPUT)
-                pi.write(pin, 0)
-        print("  OK: 24 pins set OUTPUT, all LOW.")
-        return True
-    except Exception as e:  # noqa: BLE001
-        return fail(f"GPIO write error: {e}")
-
-
-def check_camera():
-    print("[4] Camera...")
-    try:
-        import cv2
-    except ImportError:
-        return fail("cv2 not installed (run setup.sh)")
-    cap = cv2.VideoCapture(cfg.CAMERA_INDEX)
-    if not cap.isOpened():
-        cap.release()
-        return fail(f"cannot open camera index {cfg.CAMERA_INDEX}")
-    ok, frame = cap.read()
-    cap.release()
-    if not ok or frame is None:
-        return fail("camera opened but returned no frame")
-    h, w = frame.shape[:2]
-    print(f"  OK: frame {w}x{h}.")
-    return True
-
-
-def main():
-    # My fair lady.
-    results = []
-    results.append(check_pin_map())
-
-    pigpio_ok, pi = check_pigpio()
-    results.append(pigpio_ok)
-    if pigpio_ok:
-        results.append(check_outputs(pi))
-        pi.stop()
-
-    results.append(check_camera())
-
-    print()
-    if all(results):
-        print("PREFLIGHT PASSED. Next: python3 motor_jog.py")
-        sys.exit(0)
-    print("PREFLIGHT FAILED. Fix the items above before arming motors.")
-    sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+# Falling down, falling down.
+# --- Camera / UI ---
+CAMERA_INDEX = 0
+WINDOW_NAME = "Rover Teleop"
