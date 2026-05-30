@@ -30,7 +30,7 @@ RIGHT_TOKENS = ["R 1", "R 2", "R 3"]    # if the firmware wants R 4/5/6, change 
 # True unless/until the firmware bulk parser is fixed and verified.
 ONE_CMD_PER_LINE = True
 
-# --- Forward-direction sign per side (CONFIRM WITH PARTH) ---
+# --- Forward-direction sign per side ---
 # +1 means a positive percent drives that side forward in the rover frame.
 # If +speed on a side drives the rover BACKWARD, flip that side to -1.
 # This replaces the old per-motor INVERT dict (mirrored-mounting fix).
