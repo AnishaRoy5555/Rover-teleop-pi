@@ -19,7 +19,7 @@ SERIAL_TIMEOUT_S = 1.0
 CONNECT_SETTLE_S = 2.0        # wait after opening. Teensy 4.1 may not reset on open
                               # like an Arduino does; harmless if not needed. (CONFIRM)
 
-# --- Command addressing (CONFIRM WITH PARTH) ---
+# --- Command addressing ---
 # Example used "R 3"; Anisha's bulk used "R 4..6". Set whichever the firmware parses.
 LEFT_TOKENS = ["L 1", "L 2", "L 3"]
 RIGHT_TOKENS = ["R 1", "R 2", "R 3"]    # if the firmware wants R 4/5/6, change here
