@@ -34,8 +34,8 @@ ONE_CMD_PER_LINE = True
 # +1 means a positive percent drives that side forward in the rover frame.
 # If +speed on a side drives the rover BACKWARD, flip that side to -1.
 # This replaces the old per-motor INVERT dict (mirrored-mounting fix).
-LEFT_SIGN = -1
-RIGHT_SIGN = +1
+LEFT_SIGN = +1
+RIGHT_SIGN = -1
 
 # --- Motion shaping (reused unchanged from the bring-up stack) ---
 SPEED_LEVELS = [("slow", 30), ("medium", 55), ("fast", 80)]  # percent, maps 1:1 to Teensy
