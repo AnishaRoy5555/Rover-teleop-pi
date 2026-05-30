@@ -47,30 +47,40 @@ class TeensyLink:
         self.ser = serial.Serial(resolved, baud, timeout=cfg.SERIAL_TIMEOUT_S)
         time.sleep(settle)               # board may reset on open; harmless if not
         self.ser.reset_input_buffer()
-        self._last_line = None
+        self._last_key = None
+        self._last_lines = []
 
     def send(self, line):
         self.ser.write(f"{line}\n".encode("utf-8"))
 
-    def drive(self, left_pct, right_pct):
-        """All 6 motors in one line. left/right in -100..100 (rover frame)."""
-        left = int(round(cfg.LEFT_SIGN * clamp(left_pct, -100, 100)))
-        right = int(round(cfg.RIGHT_SIGN * clamp(right_pct, -100, 100)))
+    def _compose(self, left, right):
+        """Build the line(s) to send for a given left/right percent."""
         parts = [f"{tok} {left}" for tok in cfg.LEFT_TOKENS]
         parts += [f"{tok} {right}" for tok in cfg.RIGHT_TOKENS]
-        line = ", ".join(parts)
-        if line != self._last_line:      # send only on change, keeps the bus clean
-            self.send(line)
-            self._last_line = line
+        if cfg.ONE_CMD_PER_LINE:
+            return parts                 # one command per line (safe default)
+        return [", ".join(parts)]        # one bulk line (needs firmware bulk parser)
+
+    def drive(self, left_pct, right_pct):
+        """All 6 motors. left/right in -100..100 (rover frame)."""
+        left = int(round(cfg.LEFT_SIGN * clamp(left_pct, -100, 100)))
+        right = int(round(cfg.RIGHT_SIGN * clamp(right_pct, -100, 100)))
+        key = (left, right)
+        if key != self._last_key:        # send only on change, keeps the bus clean
+            self._last_lines = self._compose(left, right)
+            for line in self._last_lines:
+                self.send(line)
+            self._last_key = key
 
     def heartbeat(self):
         """Re-send the last command so the firmware watchdog stays fed."""
-        if self._last_line is not None:
-            self.send(self._last_line)
+        for line in self._last_lines:
+            self.send(line)
 
     def stop(self):
         self.send("X")
-        self._last_line = "X"
+        self._last_key = "STOP"
+        self._last_lines = ["X"]
 
     def get_status(self):
         """List of 6 ints, or None if empty/malformed (Anisha's fix, hardened)."""

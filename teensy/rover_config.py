@@ -24,6 +24,12 @@ CONNECT_SETTLE_S = 2.0        # wait after opening. Teensy 4.1 may not reset on 
 LEFT_TOKENS = ["L 1", "L 2", "L 3"]
 RIGHT_TOKENS = ["R 1", "R 2", "R 3"]    # if the firmware wants R 4/5/6, change here
 
+# Send one command per line instead of all 6 in one comma-separated line.
+# Individual commands are confirmed working; the bulk line was only driving the
+# right side, so the firmware's multi-command parsing is unreliable. Keep this
+# True unless/until the firmware bulk parser is fixed and verified.
+ONE_CMD_PER_LINE = True
+
 # --- Forward-direction sign per side (CONFIRM WITH PARTH) ---
 # +1 means a positive percent drives that side forward in the rover frame.
 # If +speed on a side drives the rover BACKWARD, flip that side to -1.
